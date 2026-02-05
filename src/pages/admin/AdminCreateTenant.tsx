@@ -1,46 +1,103 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useState } from "react";
+import { tenantsService } from "@/services/admin/tenants";
+import { getErrorMessage } from "@/services/api-client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminCreateTenant() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
-    companyName: "",
-    subdomain: "",
-    plan: "",
-    adminName: "",
-    adminEmail: "",
+    tenant_name: "",
+    tenant_slug: "",
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.tenant_name.trim()) {
+      newErrors.tenant_name = "Nome da empresa é obrigatório";
+    }
+
+    if (!formData.tenant_slug.trim()) {
+      newErrors.tenant_slug = "Slug é obrigatório";
+    } else if (!/^[a-z0-9-]+$/.test(formData.tenant_slug)) {
+      newErrors.tenant_slug = "Slug deve conter apenas letras minúsculas, números e hífens";
+    }
+
+    if (!formData.admin_name.trim()) {
+      newErrors.admin_name = "Nome do administrador é obrigatório";
+    }
+
+    if (!formData.admin_email.trim()) {
+      newErrors.admin_email = "E-mail é obrigatório";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.admin_email)) {
+      newErrors.admin_email = "E-mail inválido";
+    }
+
+    if (!formData.admin_password) {
+      newErrors.admin_password = "Senha é obrigatória";
+    } else if (formData.admin_password.length < 8) {
+      newErrors.admin_password = "Senha deve ter no mínimo 8 caracteres";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate creation
-    navigate("/admin/tenants");
+
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    try {
+      const response = await tenantsService.create(formData);
+      toast({
+        title: "Tenant criado com sucesso!",
+        description: `Acesso: ${response.domain}`,
+      });
+      navigate("/admin/tenants");
+    } catch (error) {
+      toast({
+        title: "Erro ao criar tenant",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
 
-    // Auto-generate subdomain from company name
-    if (field === "companyName") {
-      const subdomain = value
+    // Auto-generate slug from company name
+    if (field === "tenant_name") {
+      const slug = value
         .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/[^a-z0-9\s-]/g, "")
         .replace(/\s+/g, "-")
-        .slice(0, 20);
-      setFormData((prev) => ({ ...prev, subdomain }));
+        .slice(0, 30);
+      setFormData((prev) => ({ ...prev, tenant_slug: slug }));
     }
   };
 
@@ -65,65 +122,40 @@ export default function AdminCreateTenant() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Nome da Empresa *</Label>
+                <Label htmlFor="tenant_name">Nome da Empresa *</Label>
                 <Input
-                  id="companyName"
+                  id="tenant_name"
                   placeholder="Ex: Empresa Alpha"
-                  value={formData.companyName}
-                  onChange={(e) => handleChange("companyName", e.target.value)}
-                  required
+                  value={formData.tenant_name}
+                  onChange={(e) => handleChange("tenant_name", e.target.value)}
+                  disabled={isLoading}
+                  className={errors.tenant_name ? "border-destructive" : ""}
                 />
+                {errors.tenant_name && (
+                  <p className="text-sm text-destructive">{errors.tenant_name}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="subdomain">Subdomínio *</Label>
+                <Label htmlFor="tenant_slug">Slug (Subdomínio) *</Label>
                 <div className="flex">
                   <Input
-                    id="subdomain"
+                    id="tenant_slug"
                     placeholder="empresa-alpha"
-                    value={formData.subdomain}
-                    onChange={(e) => handleChange("subdomain", e.target.value)}
-                    className="rounded-r-none"
-                    required
+                    value={formData.tenant_slug}
+                    onChange={(e) => handleChange("tenant_slug", e.target.value.toLowerCase())}
+                    className={`rounded-r-none ${errors.tenant_slug ? "border-destructive" : ""}`}
+                    disabled={isLoading}
                   />
                   <span className="inline-flex items-center rounded-r-lg border border-l-0 bg-muted px-3 text-sm text-muted-foreground">
-                    .auditpro.com
+                    .meusistema.localhost
                   </span>
                 </div>
+                {errors.tenant_slug && (
+                  <p className="text-sm text-destructive">{errors.tenant_slug}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  URL de acesso: {formData.subdomain || "empresa"}.auditpro.com
+                  URL de acesso: {formData.tenant_slug || "empresa"}.meusistema.localhost:8050
                 </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="plan">Plano *</Label>
-                <Select
-                  value={formData.plan}
-                  onValueChange={(value) => handleChange("plan", value)}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="starter">
-                      <div>
-                        <span className="font-medium">Starter</span>
-                        <span className="ml-2 text-muted-foreground">- até 5 usuários</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="professional">
-                      <div>
-                        <span className="font-medium">Professional</span>
-                        <span className="ml-2 text-muted-foreground">- até 25 usuários</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="enterprise">
-                      <div>
-                        <span className="font-medium">Enterprise</span>
-                        <span className="ml-2 text-muted-foreground">- usuários ilimitados</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>
@@ -138,27 +170,64 @@ export default function AdminCreateTenant() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="adminName">Nome Completo *</Label>
+                <Label htmlFor="admin_name">Nome Completo *</Label>
                 <Input
-                  id="adminName"
+                  id="admin_name"
                   placeholder="Ex: João da Silva"
-                  value={formData.adminName}
-                  onChange={(e) => handleChange("adminName", e.target.value)}
-                  required
+                  value={formData.admin_name}
+                  onChange={(e) => handleChange("admin_name", e.target.value)}
+                  disabled={isLoading}
+                  className={errors.admin_name ? "border-destructive" : ""}
                 />
+                {errors.admin_name && (
+                  <p className="text-sm text-destructive">{errors.admin_name}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="adminEmail">E-mail *</Label>
+                <Label htmlFor="admin_email">E-mail *</Label>
                 <Input
-                  id="adminEmail"
+                  id="admin_email"
                   type="email"
                   placeholder="joao@empresa.com"
-                  value={formData.adminEmail}
-                  onChange={(e) => handleChange("adminEmail", e.target.value)}
-                  required
+                  value={formData.admin_email}
+                  onChange={(e) => handleChange("admin_email", e.target.value)}
+                  disabled={isLoading}
+                  className={errors.admin_email ? "border-destructive" : ""}
                 />
+                {errors.admin_email && (
+                  <p className="text-sm text-destructive">{errors.admin_email}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin_password">Senha *</Label>
+                <div className="relative">
+                  <Input
+                    id="admin_password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 8 caracteres"
+                    value={formData.admin_password}
+                    onChange={(e) => handleChange("admin_password", e.target.value)}
+                    disabled={isLoading}
+                    className={errors.admin_password ? "border-destructive" : ""}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {errors.admin_password && (
+                  <p className="text-sm text-destructive">{errors.admin_password}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Um e-mail com instruções de acesso será enviado
+                  Esta será a senha de acesso do administrador do tenant
                 </p>
               </div>
             </CardContent>
@@ -167,11 +236,23 @@ export default function AdminCreateTenant() {
 
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={() => navigate("/admin/tenants")}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/admin/tenants")}
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
-          <Button type="submit">
-            Criar Tenant
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Criando...
+              </>
+            ) : (
+              "Criar Tenant"
+            )}
           </Button>
         </div>
       </form>

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Ban } from "lucide-react";
+import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Ban, Power, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -19,46 +19,78 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface Tenant {
-  id: string;
-  name: string;
-  subdomain: string;
-  plan: string;
-  status: "active" | "pending" | "suspended";
-  createdAt: string;
-  usersCount: number;
-  auditsCount: number;
-}
-
-const mockTenants: Tenant[] = [
-  { id: "1", name: "Empresa Alpha", subdomain: "alpha", plan: "Enterprise", status: "active", createdAt: "2024-01-15", usersCount: 25, auditsCount: 143 },
-  { id: "2", name: "Beta Industria", subdomain: "beta", plan: "Professional", status: "active", createdAt: "2024-01-20", usersCount: 12, auditsCount: 87 },
-  { id: "3", name: "Gamma Solutions", subdomain: "gamma", plan: "Starter", status: "pending", createdAt: "2024-02-01", usersCount: 5, auditsCount: 12 },
-  { id: "4", name: "Delta Corp", subdomain: "delta", plan: "Professional", status: "active", createdAt: "2024-02-03", usersCount: 18, auditsCount: 56 },
-  { id: "5", name: "Epsilon LTDA", subdomain: "epsilon", plan: "Enterprise", status: "active", createdAt: "2024-02-10", usersCount: 32, auditsCount: 201 },
-  { id: "6", name: "Zeta Alimentos", subdomain: "zeta", plan: "Starter", status: "suspended", createdAt: "2024-01-05", usersCount: 3, auditsCount: 8 },
-];
+import { tenantsService } from "@/services/admin/tenants";
+import { getErrorMessage } from "@/services/api-client";
+import { useToast } from "@/hooks/use-toast";
+import type { Tenant } from "@/types/api";
 
 const statusMap = {
   active: { label: "Ativo", variant: "success" as const },
-  pending: { label: "Pendente", variant: "warning" as const },
-  suspended: { label: "Suspenso", variant: "destructive" as const },
+  inactive: { label: "Inativo", variant: "destructive" as const },
 };
 
 export default function AdminTenants() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [planFilter, setPlanFilter] = useState<string>("all");
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isToggling, setIsToggling] = useState<string | null>(null);
 
-  const filteredTenants = mockTenants.filter((tenant) => {
-    const matchesSearch = tenant.name.toLowerCase().includes(search.toLowerCase()) ||
-      tenant.subdomain.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || tenant.status === statusFilter;
-    const matchesPlan = planFilter === "all" || tenant.plan === planFilter;
-    return matchesSearch && matchesStatus && matchesPlan;
-  });
+  const loadTenants = async () => {
+    setIsLoading(true);
+    try {
+      const params: { search?: string; active?: boolean } = {};
+      if (search) params.search = search;
+      if (statusFilter === "active") params.active = true;
+      if (statusFilter === "inactive") params.active = false;
+
+      const response = await tenantsService.list(params);
+      setTenants(response.data);
+    } catch (error) {
+      toast({
+        title: "Erro ao carregar tenants",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTenants();
+  }, [statusFilter]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadTenants();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleToggleStatus = async (tenant: Tenant, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsToggling(tenant.id);
+    try {
+      const response = await tenantsService.toggleStatus(tenant.id);
+      toast({
+        title: response.is_active ? "Tenant ativado" : "Tenant desativado",
+        description: `${tenant.name} foi ${response.is_active ? "ativado" : "desativado"} com sucesso.`,
+      });
+      loadTenants();
+    } catch (error) {
+      toast({
+        title: "Erro ao alterar status",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setIsToggling(null);
+    }
+  };
 
   const columns: Column<Tenant>[] = [
     {
@@ -67,38 +99,26 @@ export default function AdminTenants() {
       cell: (row) => (
         <div>
           <p className="font-medium">{row.name}</p>
-          <p className="text-sm text-muted-foreground">{row.subdomain}.auditpro.com</p>
+          <p className="text-sm text-muted-foreground">{row.slug}.meusistema.localhost</p>
         </div>
       ),
     },
     {
-      key: "plan",
-      header: "Plano",
-      cell: (row) => <StatusBadge variant="primary">{row.plan}</StatusBadge>,
-    },
-    {
-      key: "users",
-      header: "Usuários",
-      cell: (row) => row.usersCount,
-    },
-    {
-      key: "audits",
-      header: "Auditorias",
-      cell: (row) => row.auditsCount,
-    },
-    {
       key: "status",
       header: "Status",
-      cell: (row) => (
-        <StatusBadge variant={statusMap[row.status].variant} dot>
-          {statusMap[row.status].label}
-        </StatusBadge>
-      ),
+      cell: (row) => {
+        const status = row.is_active ? "active" : "inactive";
+        return (
+          <StatusBadge variant={statusMap[status].variant} dot>
+            {statusMap[status].label}
+          </StatusBadge>
+        );
+      },
     },
     {
       key: "createdAt",
       header: "Criado em",
-      cell: (row) => new Date(row.createdAt).toLocaleDateString("pt-BR"),
+      cell: (row) => new Date(row.created_at).toLocaleDateString("pt-BR"),
     },
     {
       key: "actions",
@@ -106,7 +126,7 @@ export default function AdminTenants() {
       cell: (row) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -119,9 +139,21 @@ export default function AdminTenants() {
               <Edit className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              <Ban className="mr-2 h-4 w-4" />
-              Suspender
+            <DropdownMenuItem
+              onClick={(e) => handleToggleStatus(row, e)}
+              disabled={isToggling === row.id}
+            >
+              {row.is_active ? (
+                <>
+                  <Ban className="mr-2 h-4 w-4" />
+                  Desativar
+                </>
+              ) : (
+                <>
+                  <Power className="mr-2 h-4 w-4" />
+                  Ativar
+                </>
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -136,10 +168,15 @@ export default function AdminTenants() {
         title="Tenants"
         description="Gerencie todas as empresas cadastradas no sistema"
       >
-        <Button onClick={() => navigate("/admin/tenants/novo")} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Tenant
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadTenants} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button onClick={() => navigate("/admin/tenants/novo")} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Tenant
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filters */}
@@ -147,7 +184,7 @@ export default function AdminTenants() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome ou subdomínio..."
+            placeholder="Buscar por nome ou slug..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -162,30 +199,37 @@ export default function AdminTenants() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="active">Ativo</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="suspended">Suspenso</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={planFilter} onValueChange={setPlanFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Plano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Starter">Starter</SelectItem>
-              <SelectItem value="Professional">Professional</SelectItem>
-              <SelectItem value="Enterprise">Enterprise</SelectItem>
+              <SelectItem value="inactive">Inativo</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredTenants}
-        onRowClick={(row) => navigate(`/admin/tenants/${row.id}`)}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : tenants.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-lg font-medium text-muted-foreground">Nenhum tenant encontrado</p>
+          <p className="text-sm text-muted-foreground">
+            {search ? "Tente buscar com outros termos" : "Crie o primeiro tenant para começar"}
+          </p>
+          {!search && (
+            <Button onClick={() => navigate("/admin/tenants/novo")} className="mt-4 gap-2">
+              <Plus className="h-4 w-4" />
+              Criar Tenant
+            </Button>
+          )}
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={tenants}
+          onRowClick={(row) => navigate(`/admin/tenants/${row.id}`)}
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,29 @@
 import { Outlet } from "react-router-dom";
 import { AdminSidebar } from "./AdminSidebar";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function AdminLayout() {
+  const { admin, logout } = useAdminAuth();
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       <AdminSidebar />
@@ -27,15 +46,30 @@ export function AdminLayout() {
                 3
               </span>
             </Button>
-            <div className="flex items-center gap-3 border-l pl-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
-                AD
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium">Admin Master</p>
-                <p className="text-xs text-muted-foreground">Administrador</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 border-l pl-3 hover:opacity-80 transition-opacity">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
+                    {admin ? getInitials(admin.name) : "AD"}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium">{admin?.name || "Admin"}</p>
+                    <p className="text-xs text-muted-foreground">Administrador</p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{admin?.name}</p>
+                  <p className="text-xs text-muted-foreground">{admin?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         {/* Main content */}

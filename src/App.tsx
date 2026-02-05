@@ -4,6 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+// Contexts
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+
+// Components
+import { ProtectedAdminRoute } from "@/components/ProtectedRoute";
+
 // Layouts
 import { AdminLayout } from "@/components/layouts/AdminLayout";
 import { TenantLayout } from "@/components/layouts/TenantLayout";
@@ -31,6 +37,30 @@ import TenantReports from "./pages/tenant/TenantReports";
 
 const queryClient = new QueryClient();
 
+function AdminRoutes() {
+  return (
+    <AdminAuthProvider>
+      <Routes>
+        <Route path="login" element={<AdminLogin />} />
+        <Route
+          element={
+            <ProtectedAdminRoute>
+              <AdminLayout />
+            </ProtectedAdminRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="tenants" element={<AdminTenants />} />
+          <Route path="tenants/novo" element={<AdminCreateTenant />} />
+          <Route path="tenants/:id" element={<AdminTenantDetails />} />
+          <Route path="usuarios" element={<AdminDashboard />} />
+          <Route path="configuracoes" element={<AdminDashboard />} />
+        </Route>
+      </Routes>
+    </AdminAuthProvider>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -42,15 +72,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
 
           {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="tenants" element={<AdminTenants />} />
-            <Route path="tenants/novo" element={<AdminCreateTenant />} />
-            <Route path="tenants/:id" element={<AdminTenantDetails />} />
-            <Route path="usuarios" element={<AdminDashboard />} />
-            <Route path="configuracoes" element={<AdminDashboard />} />
-          </Route>
+          <Route path="/admin/*" element={<AdminRoutes />} />
 
           {/* Tenant Routes */}
           <Route path="/tenant/login" element={<TenantLogin />} />

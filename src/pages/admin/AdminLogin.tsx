@@ -1,27 +1,36 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 export default function AdminLogin() {
-  const navigate = useNavigate();
+  const { login, error, clearError, isLoading } = useAdminAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError("");
+    clearError();
+
     if (!email || !password) {
-      setError("Preencha todos os campos");
+      setLocalError("Preencha todos os campos");
       return;
     }
-    // Simulate login
-    navigate("/admin");
+
+    try {
+      await login({ email, password });
+    } catch {
+      // Error is handled by the context
+    }
   };
+
+  const displayError = localError || error;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-sidebar to-sidebar/80 p-4">
@@ -39,9 +48,9 @@ export default function AdminLogin() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="rounded-lg bg-destructive-light p-3 text-sm text-destructive">
-                {error}
+            {displayError && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {displayError}
               </div>
             )}
             <div className="space-y-2">
@@ -52,6 +61,7 @@ export default function AdminLogin() {
                 placeholder="admin@sistema.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -63,11 +73,13 @@ export default function AdminLogin() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -77,8 +89,15 @@ export default function AdminLogin() {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full">
-              Entrar
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Entrando...
+                </>
+              ) : (
+                "Entrar"
+              )}
             </Button>
           </form>
         </CardContent>
