@@ -6,9 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Contexts
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import { TenantAuthProvider } from "@/contexts/TenantAuthContext";
 
 // Components
-import { ProtectedAdminRoute } from "@/components/ProtectedRoute";
+import { ProtectedAdminRoute, ProtectedTenantRoute } from "@/components/ProtectedRoute";
 
 // Layouts
 import { AdminLayout } from "@/components/layouts/AdminLayout";
@@ -61,6 +62,36 @@ function AdminRoutes() {
   );
 }
 
+function TenantRoutes() {
+  return (
+    <TenantAuthProvider>
+      <Routes>
+        <Route path="login" element={<TenantLogin />} />
+        <Route
+          element={
+            <ProtectedTenantRoute>
+              <TenantLayout />
+            </ProtectedTenantRoute>
+          }
+        >
+          <Route index element={<TenantDashboard />} />
+          <Route path="checklists" element={<TenantChecklists />} />
+          <Route path="checklists/novo" element={<TenantChecklistEditor />} />
+          <Route path="checklists/:id" element={<TenantChecklistEditor />} />
+          <Route path="checklists/:id/editar" element={<TenantChecklistEditor />} />
+          <Route path="auditorias" element={<TenantDashboard />} />
+          <Route path="auditorias/nova" element={<TenantAuditExecution />} />
+          <Route path="auditorias/:id" element={<TenantAuditResult />} />
+          <Route path="auditorias/:id/resultado" element={<TenantAuditResult />} />
+          <Route path="nao-conformidades" element={<TenantNonConformities />} />
+          <Route path="relatorios" element={<TenantReports />} />
+          <Route path="configuracoes" element={<TenantDashboard />} />
+        </Route>
+      </Routes>
+    </TenantAuthProvider>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -75,21 +106,7 @@ const App = () => (
           <Route path="/admin/*" element={<AdminRoutes />} />
 
           {/* Tenant Routes */}
-          <Route path="/tenant/login" element={<TenantLogin />} />
-          <Route path="/tenant" element={<TenantLayout />}>
-            <Route index element={<TenantDashboard />} />
-            <Route path="checklists" element={<TenantChecklists />} />
-            <Route path="checklists/novo" element={<TenantChecklistEditor />} />
-            <Route path="checklists/:id" element={<TenantChecklistEditor />} />
-            <Route path="checklists/:id/editar" element={<TenantChecklistEditor />} />
-            <Route path="auditorias" element={<TenantDashboard />} />
-            <Route path="auditorias/nova" element={<TenantAuditExecution />} />
-            <Route path="auditorias/:id" element={<TenantAuditResult />} />
-            <Route path="auditorias/:id/resultado" element={<TenantAuditResult />} />
-            <Route path="nao-conformidades" element={<TenantNonConformities />} />
-            <Route path="relatorios" element={<TenantReports />} />
-            <Route path="configuracoes" element={<TenantDashboard />} />
-          </Route>
+          <Route path="/tenant/*" element={<TenantRoutes />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

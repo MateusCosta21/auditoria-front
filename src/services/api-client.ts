@@ -76,6 +76,24 @@ adminApi.interceptors.response.use(
   }
 );
 
+// Tenant slug extraction and singleton API
+export function getTenantSlug(): string {
+  const hostname = window.location.hostname;
+  return hostname.split('.')[0];
+}
+
+let tenantApiInstance: AxiosInstance | null = null;
+let tenantApiSlug: string | null = null;
+
+export function getTenantApi(): AxiosInstance {
+  const slug = getTenantSlug();
+  if (!tenantApiInstance || tenantApiSlug !== slug) {
+    tenantApiInstance = createTenantApi(slug);
+    tenantApiSlug = slug;
+  }
+  return tenantApiInstance;
+}
+
 // Helper to extract error message from API response
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {

@@ -4,9 +4,17 @@ import { Bell, Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
+import { useTenantAuth } from "@/contexts/TenantAuthContext";
 
 export function TenantLayout() {
   const navigate = useNavigate();
+  const { user } = useTenantAuth();
+
+  const initials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
+
+  const roleLabel = user?.role === 'admin' ? 'Administrador' : user?.role === 'auditor' ? 'Auditor' : 'Usuário';
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -24,7 +32,7 @@ export function TenantLayout() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
+            <Button
               onClick={() => navigate("/tenant/auditorias/nova")}
               className="gap-2"
             >
@@ -33,17 +41,14 @@ export function TenantLayout() {
             </Button>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-                5
-              </span>
             </Button>
             <div className="flex items-center gap-3 border-l pl-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
-                JD
+                {initials}
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm font-medium">João da Silva</p>
-                <p className="text-xs text-muted-foreground">Auditor</p>
+                <p className="text-sm font-medium">{user?.name ?? 'Usuário'}</p>
+                <p className="text-xs text-muted-foreground">{roleLabel}</p>
               </div>
             </div>
           </div>

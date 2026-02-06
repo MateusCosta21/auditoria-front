@@ -1,13 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Search, Filter, Plus, Upload, Calendar, User, Clock } from "lucide-react";
+import { useState, useRef } from "react";
+import { Search, Filter, Upload, Calendar, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable, Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -20,29 +19,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-
-interface NonConformity {
-  id: string;
-  item: string;
-  section: string;
-  weight: 1 | 2 | 3;
-  auditDate: string;
-  responsible: string | null;
-  deadline: string | null;
-  status: "open" | "in_progress" | "resolved" | "overdue";
-  action: string | null;
-}
-
-const mockNonConformities: NonConformity[] = [
-  { id: "1", item: "EPIs não utilizados corretamente", section: "Segurança", weight: 3, auditDate: "2024-02-03", responsible: "Carlos Oliveira", deadline: "2024-02-10", status: "in_progress", action: "Realizar treinamento de reciclagem sobre uso de EPIs" },
-  { id: "2", item: "Área de trabalho desorganizada", section: "5S", weight: 3, auditDate: "2024-02-03", responsible: "Maria Santos", deadline: "2024-02-08", status: "overdue", action: "Reorganizar estações de trabalho e aplicar 5S" },
-  { id: "3", item: "Registros com preenchimento incorreto", section: "Documentação", weight: 2, auditDate: "2024-02-01", responsible: null, deadline: null, status: "open", action: null },
-  { id: "4", item: "Extintor vencido", section: "Segurança", weight: 3, auditDate: "2024-01-28", responsible: "João Silva", deadline: "2024-02-05", status: "resolved", action: "Substituição do extintor e atualização do plano de manutenção" },
-  { id: "5", item: "Documentação desatualizada", section: "ISO", weight: 2, auditDate: "2024-01-25", responsible: "Ana Costa", deadline: "2024-02-15", status: "in_progress", action: "Revisão e atualização dos procedimentos operacionais" },
-];
+import { useNonConformities, useUpdateNonConformity } from "@/hooks/tenant/useNonConformities";
+import { useToast } from "@/hooks/use-toast";
+import type { NonConformityListItem } from "@/types/api";
 
 const statusMap = {
   open: { label: "Aberta", variant: "default" as const },
@@ -58,19 +39,59 @@ const weightLabels = {
 };
 
 export default function TenantNonConformities() {
-  const navigate = useNavigate();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedNC, setSelectedNC] = useState<NonConformity | null>(null);
+  const [selectedNC, setSelectedNC] = useState<NonConformityListItem | null>(null);
 
-  const filteredNCs = mockNonConformities.filter((nc) => {
-    const matchesSearch = nc.item.toLowerCase().includes(search.toLowerCase()) ||
-      nc.section.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || nc.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  // Dialog form state
+  const [formResponsible, setFormResponsible] = useState("");
+  const [formDeadline, setFormDeadline] = useState("");
+  const [formAction, setFormAction] = useState("");
+  const [formStatus, setFormStatus] = useState("open");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+
+  const { data: ncData, isLoading } = useNonConformities({
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
   });
+  const updateMutation = useUpdateNonConformity();
 
-  const columns: Column<NonConformity>[] = [
+  const openDialog = (nc: NonConformityListItem) => {
+    setSelectedNC(nc);
+    setFormResponsible(nc.responsible || "");
+    setFormDeadline(nc.deadline || "");
+    setFormAction(nc.action || "");
+    setFormStatus(nc.status);
+    setEvidenceFile(null);
+  };
+
+  const handleSave = () => {
+    if (!selectedNC) return;
+    const formData = new FormData();
+    formData.append("responsible", formResponsible);
+    formData.append("deadline", formDeadline);
+    formData.append("action", formAction);
+    formData.append("status", formStatus);
+    if (evidenceFile) {
+      formData.append("evidence", evidenceFile);
+    }
+    updateMutation.mutate(
+      { id: selectedNC.id, formData },
+      {
+        onSuccess: () => {
+          toast({ title: "Não conformidade atualizada" });
+          setSelectedNC(null);
+        },
+        onError: () => {
+          toast({ title: "Erro ao atualizar", variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const columns: Column<NonConformityListItem>[] = [
     {
       key: "item",
       header: "Item",
@@ -118,7 +139,7 @@ export default function TenantNonConformities() {
           size="sm"
           onClick={(e) => {
             e.stopPropagation();
-            setSelectedNC(row);
+            openDialog(row);
           }}
         >
           Gerenciar
@@ -128,14 +149,15 @@ export default function TenantNonConformities() {
     },
   ];
 
-  // Stats
-  const stats = {
-    total: mockNonConformities.length,
-    open: mockNonConformities.filter((nc) => nc.status === "open").length,
-    inProgress: mockNonConformities.filter((nc) => nc.status === "in_progress").length,
-    overdue: mockNonConformities.filter((nc) => nc.status === "overdue").length,
-    resolved: mockNonConformities.filter((nc) => nc.status === "resolved").length,
-  };
+  const stats = ncData?.stats;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -150,7 +172,7 @@ export default function TenantNonConformities() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-sm text-muted-foreground">Abertas</p>
-              <p className="text-2xl font-bold">{stats.open}</p>
+              <p className="text-2xl font-bold">{stats?.open ?? 0}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
               <div className="h-3 w-3 rounded-full bg-muted-foreground" />
@@ -161,7 +183,7 @@ export default function TenantNonConformities() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-sm text-muted-foreground">Em Andamento</p>
-              <p className="text-2xl font-bold text-warning">{stats.inProgress}</p>
+              <p className="text-2xl font-bold text-warning">{stats?.in_progress ?? 0}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-warning-light flex items-center justify-center">
               <div className="h-3 w-3 rounded-full bg-warning" />
@@ -172,7 +194,7 @@ export default function TenantNonConformities() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-sm text-muted-foreground">Atrasadas</p>
-              <p className="text-2xl font-bold text-destructive">{stats.overdue}</p>
+              <p className="text-2xl font-bold text-destructive">{stats?.overdue ?? 0}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-destructive-light flex items-center justify-center">
               <div className="h-3 w-3 rounded-full bg-destructive" />
@@ -183,7 +205,7 @@ export default function TenantNonConformities() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-sm text-muted-foreground">Resolvidas</p>
-              <p className="text-2xl font-bold text-success">{stats.resolved}</p>
+              <p className="text-2xl font-bold text-success">{stats?.resolved ?? 0}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-success-light flex items-center justify-center">
               <div className="h-3 w-3 rounded-full bg-success" />
@@ -219,7 +241,7 @@ export default function TenantNonConformities() {
       </div>
 
       {/* Table */}
-      <DataTable columns={columns} data={filteredNCs} />
+      <DataTable columns={columns} data={ncData?.data ?? []} />
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedNC} onOpenChange={() => setSelectedNC(null)}>
@@ -247,24 +269,22 @@ export default function TenantNonConformities() {
                     <User className="h-4 w-4" />
                     Responsável
                   </Label>
-                  <Select defaultValue={selectedNC.responsible || undefined}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Carlos Oliveira">Carlos Oliveira</SelectItem>
-                      <SelectItem value="Maria Santos">Maria Santos</SelectItem>
-                      <SelectItem value="João Silva">João Silva</SelectItem>
-                      <SelectItem value="Ana Costa">Ana Costa</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    placeholder="Nome do responsável"
+                    value={formResponsible}
+                    onChange={(e) => setFormResponsible(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Prazo
                   </Label>
-                  <Input type="date" defaultValue={selectedNC.deadline || undefined} />
+                  <Input
+                    type="date"
+                    value={formDeadline}
+                    onChange={(e) => setFormDeadline(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -272,26 +292,40 @@ export default function TenantNonConformities() {
                 <Label>Ação Corretiva</Label>
                 <Textarea
                   placeholder="Descreva a ação corretiva a ser tomada..."
-                  defaultValue={selectedNC.action || ""}
+                  value={formAction}
+                  onChange={(e) => setFormAction(e.target.value)}
                   className="min-h-[100px]"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>Evidência de Resolução</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setEvidenceFile(file);
+                  }}
+                />
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" className="gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Upload className="h-4 w-4" />
                     Upload de Arquivo
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    Nenhum arquivo anexado
+                    {evidenceFile ? evidenceFile.name : "Nenhum arquivo anexado"}
                   </span>
                 </div>
               </div>
 
               <div className="flex justify-between">
-                <Select defaultValue={selectedNC.status}>
+                <Select value={formStatus} onValueChange={setFormStatus}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue />
                   </SelectTrigger>
@@ -305,8 +339,15 @@ export default function TenantNonConformities() {
                   <Button variant="outline" onClick={() => setSelectedNC(null)}>
                     Cancelar
                   </Button>
-                  <Button onClick={() => setSelectedNC(null)}>
-                    Salvar
+                  <Button onClick={handleSave} disabled={updateMutation.isPending}>
+                    {updateMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      "Salvar"
+                    )}
                   </Button>
                 </div>
               </div>

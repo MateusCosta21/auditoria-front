@@ -72,6 +72,246 @@ export interface TenantLoginResponse {
   user: TenantUser;
 }
 
+// Dashboard types
+export interface DashboardStats {
+  audits_this_month: number;
+  audits_trend: number;
+  average_compliance: number;
+  compliance_trend: number;
+  open_ncs: number;
+  critical_ncs: number;
+  active_checklists: number;
+}
+
+export interface ComplianceByArea {
+  name: string;
+  value: number;
+}
+
+export interface NcBySeverity {
+  critical: number;
+  medium: number;
+  low: number;
+}
+
+// Checklist types
+export interface ChecklistQuestion {
+  id?: number;
+  text: string;
+  weight: 1 | 2 | 3;
+  photo_required: boolean;
+  comment_required: boolean;
+  order: number;
+}
+
+export interface ChecklistSection {
+  id?: number;
+  name: string;
+  order: number;
+  questions: ChecklistQuestion[];
+}
+
+export interface ChecklistListItem {
+  id: number;
+  name: string;
+  category: string;
+  status: 'active' | 'draft';
+  sections_count: number;
+  questions_count: number;
+  audits_count: number;
+  updated_at: string;
+}
+
+export interface ChecklistDetail {
+  id: number;
+  name: string;
+  category: string;
+  status: 'active' | 'draft';
+  sections: ChecklistSection[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistListResponse {
+  data: ChecklistListItem[];
+  total: number;
+}
+
+export interface SaveChecklistRequest {
+  name: string;
+  category: string;
+  status: 'active' | 'draft';
+  sections: {
+    name: string;
+    order: number;
+    questions: {
+      text: string;
+      weight: 1 | 2 | 3;
+      photo_required: boolean;
+      comment_required: boolean;
+      order: number;
+    }[];
+  }[];
+}
+
+// Audit types
+export interface AuditListItem {
+  id: number;
+  checklist_name: string;
+  unit: string;
+  auditor_name: string;
+  date: string;
+  score: number | null;
+  status: 'completed' | 'in_progress' | 'pending';
+  non_conformities_count: number;
+}
+
+export interface AuditListResponse {
+  data: AuditListItem[];
+  total: number;
+}
+
+export interface AuditSectionDetail {
+  id: number;
+  name: string;
+  order: number;
+  score: number | null;
+  max_score: number | null;
+  questions: {
+    id: number;
+    text: string;
+    weight: 1 | 2 | 3;
+    photo_required: boolean;
+    comment_required: boolean;
+    order: number;
+    answer: 'conform' | 'non-conform' | 'na' | null;
+    comment: string | null;
+    photos: string[];
+  }[];
+}
+
+export interface AuditNonConformity {
+  id: number;
+  section: string;
+  question: string;
+  weight: 1 | 2 | 3;
+  comment: string;
+}
+
+export interface AuditDetail {
+  id: number;
+  checklist_id: number;
+  checklist_name: string;
+  unit: string;
+  auditor_name: string;
+  date: string;
+  score: number | null;
+  status: 'completed' | 'in_progress' | 'pending';
+  sections: AuditSectionDetail[];
+  non_conformities: AuditNonConformity[];
+  conform_count: number;
+  non_conform_count: number;
+  critical_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAuditRequest {
+  checklist_id: number;
+  unit: string;
+  date: string;
+}
+
+export interface CreateAuditResponse {
+  message: string;
+  audit: AuditDetail;
+}
+
+export interface AnswerPayload {
+  question_id: number;
+  answer: 'conform' | 'non-conform' | 'na';
+  comment?: string;
+  photos?: string[];
+}
+
+export interface UpdateAnswersResponse {
+  message: string;
+}
+
+export interface FinalizeAuditResponse {
+  message: string;
+  score: number;
+  audit: AuditDetail;
+}
+
+// Non-conformity types
+export interface NonConformityListItem {
+  id: number;
+  item: string;
+  section: string;
+  weight: 1 | 2 | 3;
+  audit_id: number;
+  audit_date: string;
+  responsible: string | null;
+  deadline: string | null;
+  status: 'open' | 'in_progress' | 'resolved' | 'overdue';
+  action: string | null;
+}
+
+export interface NonConformityListResponse {
+  data: NonConformityListItem[];
+  total: number;
+  stats: {
+    open: number;
+    in_progress: number;
+    overdue: number;
+    resolved: number;
+  };
+}
+
+export interface NonConformityDetail {
+  id: number;
+  item: string;
+  section: string;
+  weight: 1 | 2 | 3;
+  audit_id: number;
+  audit_date: string;
+  responsible: string | null;
+  deadline: string | null;
+  status: 'open' | 'in_progress' | 'resolved' | 'overdue';
+  action: string | null;
+  evidence_url: string | null;
+}
+
+// Report types
+export interface ReportListItem {
+  id: number;
+  checklist: string;
+  unit: string;
+  auditor: string;
+  date: string;
+  score: number;
+  status: 'completed' | 'in_progress';
+  non_conformities: number;
+}
+
+export interface ReportListResponse {
+  data: ReportListItem[];
+  total: number;
+  summary: {
+    total_audits: number;
+    average_compliance: number;
+    critical_audits: number;
+    total_ncs: number;
+  };
+}
+
+// Upload types
+export interface UploadPhotoResponse {
+  url: string;
+  path: string;
+}
+
 // API Error
 export interface ApiError {
   message: string;

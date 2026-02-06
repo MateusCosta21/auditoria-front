@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, Download, Calendar } from "lucide-react";
+import { Search, Filter, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -14,26 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-interface AuditReport {
-  id: string;
-  checklist: string;
-  unit: string;
-  auditor: string;
-  date: string;
-  score: number;
-  status: "completed" | "in_progress";
-  nonConformities: number;
-}
-
-const mockReports: AuditReport[] = [
-  { id: "1", checklist: "5S - Produção", unit: "Planta A", auditor: "João Silva", date: "2024-02-03", score: 87, status: "completed", nonConformities: 3 },
-  { id: "2", checklist: "Segurança Alimentar", unit: "Cozinha Central", auditor: "Maria Santos", date: "2024-02-02", score: 92, status: "completed", nonConformities: 2 },
-  { id: "3", checklist: "ISO 9001", unit: "Planta B", auditor: "Carlos Oliveira", date: "2024-02-01", score: 78, status: "completed", nonConformities: 5 },
-  { id: "4", checklist: "BPF", unit: "Laboratório", auditor: "Ana Costa", date: "2024-01-30", score: 95, status: "completed", nonConformities: 1 },
-  { id: "5", checklist: "5S - Produção", unit: "Planta B", auditor: "João Silva", date: "2024-01-28", score: 82, status: "completed", nonConformities: 4 },
-  { id: "6", checklist: "Meio Ambiente", unit: "Geral", auditor: "Maria Santos", date: "2024-01-25", score: 68, status: "completed", nonConformities: 6 },
-];
+import { useReports, useDownloadAuditPdf, useDownloadConsolidatedPdf } from "@/hooks/tenant/useReports";
+import { useToast } from "@/hooks/use-toast";
+import type { ReportListItem } from "@/types/api";
 
 const getScoreColor = (score: number) => {
   if (score >= 90) return "text-success";
@@ -42,25 +25,43 @@ const getScoreColor = (score: number) => {
 };
 
 export default function TenantReports() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [checklistFilter, setChecklistFilter] = useState<string>("all");
   const [unitFilter, setUnitFilter] = useState<string>("all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
 
-  const filteredReports = mockReports.filter((report) => {
-    const matchesSearch = report.checklist.toLowerCase().includes(search.toLowerCase()) ||
-      report.unit.toLowerCase().includes(search.toLowerCase()) ||
-      report.auditor.toLowerCase().includes(search.toLowerCase());
-    const matchesChecklist = checklistFilter === "all" || report.checklist === checklistFilter;
-    const matchesUnit = unitFilter === "all" || report.unit === unitFilter;
-    const matchesScore = scoreFilter === "all" ||
-      (scoreFilter === "excellent" && report.score >= 90) ||
-      (scoreFilter === "good" && report.score >= 70 && report.score < 90) ||
-      (scoreFilter === "critical" && report.score < 70);
-    return matchesSearch && matchesChecklist && matchesUnit && matchesScore;
+  const { data: reportsData, isLoading } = useReports({
+    search: search || undefined,
+    checklist: checklistFilter !== "all" ? checklistFilter : undefined,
+    unit: unitFilter !== "all" ? unitFilter : undefined,
+    score_range: scoreFilter !== "all" ? scoreFilter : undefined,
   });
 
-  const columns: Column<AuditReport>[] = [
+  const downloadPdf = useDownloadAuditPdf();
+  const downloadConsolidated = useDownloadConsolidatedPdf();
+
+  const handleDownloadPdf = (auditId: number) => {
+    downloadPdf.mutate(auditId, {
+      onError: () => toast({ title: "Erro ao gerar PDF", variant: "destructive" }),
+    });
+  };
+
+  const handleDownloadConsolidated = () => {
+    downloadConsolidated.mutate(
+      {
+        search: search || undefined,
+        checklist: checklistFilter !== "all" ? checklistFilter : undefined,
+        unit: unitFilter !== "all" ? unitFilter : undefined,
+        score_range: scoreFilter !== "all" ? scoreFilter : undefined,
+      },
+      {
+        onError: () => toast({ title: "Erro ao gerar relatório consolidado", variant: "destructive" }),
+      }
+    );
+  };
+
+  const columns: Column<ReportListItem>[] = [
     {
       key: "checklist",
       header: "Checklist",
@@ -94,8 +95,8 @@ export default function TenantReports() {
       key: "nonConformities",
       header: "NC",
       cell: (row) =>
-        row.nonConformities > 0 ? (
-          <StatusBadge variant="destructive">{row.nonConformities}</StatusBadge>
+        row.non_conformities > 0 ? (
+          <StatusBadge variant="destructive">{row.non_conformities}</StatusBadge>
         ) : (
           <StatusBadge variant="success">0</StatusBadge>
         ),
@@ -104,8 +105,18 @@ export default function TenantReports() {
       key: "actions",
       header: "",
       cell: (row) => (
-        <Button variant="outline" size="sm" className="gap-2">
-          <Download className="h-4 w-4" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => handleDownloadPdf(row.id)}
+          disabled={downloadPdf.isPending}
+        >
+          {downloadPdf.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
           PDF
         </Button>
       ),
@@ -113,9 +124,19 @@ export default function TenantReports() {
     },
   ];
 
-  // Unique values for filters
-  const checklists = [...new Set(mockReports.map((r) => r.checklist))];
-  const units = [...new Set(mockReports.map((r) => r.unit))];
+  // Unique values for filters from API data
+  const reports = reportsData?.data ?? [];
+  const checklists = [...new Set(reports.map((r) => r.checklist))];
+  const units = [...new Set(reports.map((r) => r.unit))];
+  const summary = reportsData?.summary;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -129,14 +150,14 @@ export default function TenantReports() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total de Auditorias</p>
-            <p className="text-3xl font-bold">{mockReports.length}</p>
+            <p className="text-3xl font-bold">{summary?.total_audits ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Média de Conformidade</p>
             <p className="text-3xl font-bold text-success">
-              {Math.round(mockReports.reduce((acc, r) => acc + r.score, 0) / mockReports.length)}%
+              {summary?.average_compliance ?? 0}%
             </p>
           </CardContent>
         </Card>
@@ -144,7 +165,7 @@ export default function TenantReports() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Auditorias Críticas</p>
             <p className="text-3xl font-bold text-destructive">
-              {mockReports.filter((r) => r.score < 70).length}
+              {summary?.critical_audits ?? 0}
             </p>
           </CardContent>
         </Card>
@@ -152,7 +173,7 @@ export default function TenantReports() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">NC Totais</p>
             <p className="text-3xl font-bold text-warning">
-              {mockReports.reduce((acc, r) => acc + r.nonConformities, 0)}
+              {summary?.total_ncs ?? 0}
             </p>
           </CardContent>
         </Card>
@@ -205,7 +226,7 @@ export default function TenantReports() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Notas</SelectItem>
-                <SelectItem value="excellent">Excelente (≥90%)</SelectItem>
+                <SelectItem value="excellent">Excelente (&ge;90%)</SelectItem>
                 <SelectItem value="good">Regular (70-89%)</SelectItem>
                 <SelectItem value="critical">Crítico (&lt;70%)</SelectItem>
               </SelectContent>
@@ -215,12 +236,20 @@ export default function TenantReports() {
       </Card>
 
       {/* Table */}
-      <DataTable columns={columns} data={filteredReports} />
+      <DataTable columns={columns} data={reports} />
 
       {/* Export Button */}
       <div className="flex justify-end">
-        <Button className="gap-2">
-          <Download className="h-4 w-4" />
+        <Button
+          className="gap-2"
+          onClick={handleDownloadConsolidated}
+          disabled={downloadConsolidated.isPending}
+        >
+          {downloadConsolidated.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
           Exportar Relatório Consolidado
         </Button>
       </div>

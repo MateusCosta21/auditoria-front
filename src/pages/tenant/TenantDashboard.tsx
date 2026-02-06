@@ -7,6 +7,7 @@ import {
   Plus,
   ArrowRight,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
@@ -15,24 +16,8 @@ import { DataTable, Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-
-interface Audit {
-  id: string;
-  checklist: string;
-  unit: string;
-  auditor: string;
-  date: string;
-  score: number;
-  status: "completed" | "in_progress" | "pending";
-  nonConformities: number;
-}
-
-const mockAudits: Audit[] = [
-  { id: "1", checklist: "5S - Produção", unit: "Planta A", auditor: "João Silva", date: "2024-02-03", score: 87, status: "completed", nonConformities: 3 },
-  { id: "2", checklist: "Segurança Alimentar", unit: "Cozinha Central", auditor: "Maria Santos", date: "2024-02-02", score: 92, status: "completed", nonConformities: 2 },
-  { id: "3", checklist: "ISO 9001", unit: "Planta B", auditor: "Carlos Oliveira", date: "2024-02-01", score: 78, status: "completed", nonConformities: 5 },
-  { id: "4", checklist: "BPF", unit: "Laboratório", auditor: "Ana Costa", date: "2024-02-03", score: 0, status: "in_progress", nonConformities: 0 },
-];
+import { useDashboardStats, useComplianceByArea, useNcBySeverity, useRecentAudits } from "@/hooks/tenant/useDashboard";
+import type { AuditListItem } from "@/types/api";
 
 const getScoreColor = (score: number) => {
   if (score >= 90) return "text-success";
@@ -48,22 +33,26 @@ const statusMap = {
 
 export default function TenantDashboard() {
   const navigate = useNavigate();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: complianceAreas, isLoading: complianceLoading } = useComplianceByArea();
+  const { data: ncSeverity, isLoading: ncLoading } = useNcBySeverity();
+  const { data: recentAudits, isLoading: auditsLoading } = useRecentAudits(5);
 
-  const columns: Column<Audit>[] = [
+  const columns: Column<AuditListItem>[] = [
     {
-      key: "checklist",
+      key: "checklist_name",
       header: "Checklist",
       cell: (row) => (
         <div>
-          <p className="font-medium">{row.checklist}</p>
+          <p className="font-medium">{row.checklist_name}</p>
           <p className="text-sm text-muted-foreground">{row.unit}</p>
         </div>
       ),
     },
     {
-      key: "auditor",
+      key: "auditor_name",
       header: "Auditor",
-      cell: (row) => row.auditor,
+      cell: (row) => row.auditor_name,
     },
     {
       key: "date",
@@ -74,7 +63,7 @@ export default function TenantDashboard() {
       key: "score",
       header: "Nota",
       cell: (row) =>
-        row.status === "completed" ? (
+        row.status === "completed" && row.score !== null ? (
           <span className={`font-bold ${getScoreColor(row.score)}`}>
             {row.score}%
           </span>
@@ -83,11 +72,11 @@ export default function TenantDashboard() {
         ),
     },
     {
-      key: "nonConformities",
+      key: "non_conformities_count",
       header: "NC",
       cell: (row) =>
-        row.nonConformities > 0 ? (
-          <StatusBadge variant="destructive">{row.nonConformities}</StatusBadge>
+        row.non_conformities_count > 0 ? (
+          <StatusBadge variant="destructive">{row.non_conformities_count}</StatusBadge>
         ) : (
           <span className="text-muted-foreground">-</span>
         ),
@@ -112,6 +101,16 @@ export default function TenantDashboard() {
       className: "w-12",
     },
   ];
+
+  const isLoading = statsLoading || complianceLoading || ncLoading || auditsLoading;
+
+  if (isLoading && !stats) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -140,28 +139,28 @@ export default function TenantDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Auditorias no Mês"
-          value={24}
+          value={stats?.audits_this_month ?? 0}
           icon={FileCheck}
           variant="primary"
-          trend={{ value: 15, isPositive: true }}
+          trend={stats?.audits_trend !== undefined ? { value: stats.audits_trend, isPositive: stats.audits_trend >= 0 } : undefined}
         />
         <StatCard
           title="Conformidade Média"
-          value="85%"
+          value={`${stats?.average_compliance ?? 0}%`}
           icon={TrendingUp}
           variant="success"
-          trend={{ value: 3, isPositive: true }}
+          trend={stats?.compliance_trend !== undefined ? { value: stats.compliance_trend, isPositive: stats.compliance_trend >= 0 } : undefined}
         />
         <StatCard
           title="NC Abertas"
-          value={12}
+          value={stats?.open_ncs ?? 0}
           icon={AlertTriangle}
           variant="destructive"
-          subtitle="4 críticas"
+          subtitle={stats?.critical_ncs ? `${stats.critical_ncs} críticas` : undefined}
         />
         <StatCard
           title="Checklists Ativos"
-          value={8}
+          value={stats?.active_checklists ?? 0}
           icon={ClipboardList}
           variant="default"
         />
@@ -174,12 +173,7 @@ export default function TenantDashboard() {
             <CardTitle>Conformidade por Área</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { name: "Produção", value: 92 },
-              { name: "Qualidade", value: 88 },
-              { name: "Segurança", value: 76 },
-              { name: "Meio Ambiente", value: 94 },
-            ].map((area) => (
+            {(complianceAreas ?? []).map((area) => (
               <div key={area.name} className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>{area.name}</span>
@@ -212,21 +206,21 @@ export default function TenantDashboard() {
                 <div className="h-3 w-3 rounded-full bg-destructive" />
                 <span className="font-medium">Críticas</span>
               </div>
-              <span className="text-xl font-bold text-destructive">4</span>
+              <span className="text-xl font-bold text-destructive">{ncSeverity?.critical ?? 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-warning-light">
               <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-warning" />
                 <span className="font-medium">Médias</span>
               </div>
-              <span className="text-xl font-bold text-warning">5</span>
+              <span className="text-xl font-bold text-warning">{ncSeverity?.medium ?? 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-success-light">
               <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-success" />
                 <span className="font-medium">Baixas</span>
               </div>
-              <span className="text-xl font-bold text-success">3</span>
+              <span className="text-xl font-bold text-success">{ncSeverity?.low ?? 0}</span>
             </div>
           </CardContent>
         </Card>
@@ -242,7 +236,7 @@ export default function TenantDashboard() {
         </div>
         <DataTable
           columns={columns}
-          data={mockAudits}
+          data={recentAudits ?? []}
           onRowClick={(row) => navigate(`/tenant/auditorias/${row.id}`)}
         />
       </div>

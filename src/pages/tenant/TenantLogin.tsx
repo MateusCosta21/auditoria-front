@@ -1,26 +1,36 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { CheckSquare, Eye, EyeOff } from "lucide-react";
+import { CheckSquare, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTenantAuth } from "@/contexts/TenantAuthContext";
 
 export default function TenantLogin() {
-  const navigate = useNavigate();
+  const { login, isLoading, error, clearError } = useTenantAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError("");
+    clearError();
+
     if (!email || !password) {
-      setError("Preencha todos os campos");
+      setLocalError("Preencha todos os campos");
       return;
     }
-    navigate("/tenant");
+
+    try {
+      await login({ email, password });
+    } catch {
+      // Error is handled by the auth context
+    }
   };
+
+  const displayError = localError || error;
 
   return (
     <div className="flex min-h-screen">
@@ -61,9 +71,9 @@ export default function TenantLogin() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
+              {displayError && (
                 <div className="rounded-lg bg-destructive-light p-3 text-sm text-destructive">
-                  {error}
+                  {displayError}
                 </div>
               )}
               <div className="space-y-2">
@@ -74,6 +84,7 @@ export default function TenantLogin() {
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -90,6 +101,7 @@ export default function TenantLogin() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
@@ -104,8 +116,15 @@ export default function TenantLogin() {
                   </button>
                 </div>
               </div>
-              <Button type="submit" className="w-full">
-                Entrar
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  "Entrar"
+                )}
               </Button>
             </form>
           </CardContent>

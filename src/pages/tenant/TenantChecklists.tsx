@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, MoreHorizontal, Edit, Copy, Trash2, Eye } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Copy, Trash2, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,36 +12,42 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-interface Checklist {
-  id: string;
-  name: string;
-  category: string;
-  sectionsCount: number;
-  questionsCount: number;
-  auditsCount: number;
-  updatedAt: string;
-  status: "active" | "draft";
-}
-
-const mockChecklists: Checklist[] = [
-  { id: "1", name: "5S - Produção", category: "Qualidade", sectionsCount: 5, questionsCount: 25, auditsCount: 45, updatedAt: "2024-02-01", status: "active" },
-  { id: "2", name: "Segurança Alimentar", category: "Segurança", sectionsCount: 8, questionsCount: 42, auditsCount: 32, updatedAt: "2024-01-28", status: "active" },
-  { id: "3", name: "ISO 9001 - Completo", category: "ISO", sectionsCount: 10, questionsCount: 68, auditsCount: 18, updatedAt: "2024-01-25", status: "active" },
-  { id: "4", name: "BPF - Laboratório", category: "BPF", sectionsCount: 6, questionsCount: 35, auditsCount: 12, updatedAt: "2024-01-20", status: "active" },
-  { id: "5", name: "Meio Ambiente (Rascunho)", category: "Meio Ambiente", sectionsCount: 4, questionsCount: 18, auditsCount: 0, updatedAt: "2024-02-02", status: "draft" },
-];
+import { useChecklists, useDuplicateChecklist, useDeleteChecklist } from "@/hooks/tenant/useChecklists";
+import { useToast } from "@/hooks/use-toast";
+import type { ChecklistListItem } from "@/types/api";
 
 export default function TenantChecklists() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const { toast } = useToast();
 
-  const filteredChecklists = mockChecklists.filter((checklist) =>
-    checklist.name.toLowerCase().includes(search.toLowerCase()) ||
-    checklist.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const { data: checklistsData, isLoading } = useChecklists({ search: search || undefined });
+  const duplicateMutation = useDuplicateChecklist();
+  const deleteMutation = useDeleteChecklist();
 
-  const columns: Column<Checklist>[] = [
+  const handleDuplicate = (id: number) => {
+    duplicateMutation.mutate(id, {
+      onSuccess: () => {
+        toast({ title: "Checklist duplicado com sucesso" });
+      },
+      onError: () => {
+        toast({ title: "Erro ao duplicar checklist", variant: "destructive" });
+      },
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        toast({ title: "Checklist excluído com sucesso" });
+      },
+      onError: () => {
+        toast({ title: "Erro ao excluir checklist", variant: "destructive" });
+      },
+    });
+  };
+
+  const columns: Column<ChecklistListItem>[] = [
     {
       key: "name",
       header: "Nome",
@@ -55,17 +61,17 @@ export default function TenantChecklists() {
     {
       key: "sections",
       header: "Seções",
-      cell: (row) => row.sectionsCount,
+      cell: (row) => row.sections_count,
     },
     {
       key: "questions",
       header: "Perguntas",
-      cell: (row) => row.questionsCount,
+      cell: (row) => row.questions_count,
     },
     {
       key: "audits",
       header: "Auditorias",
-      cell: (row) => row.auditsCount,
+      cell: (row) => row.audits_count,
     },
     {
       key: "status",
@@ -79,7 +85,7 @@ export default function TenantChecklists() {
     {
       key: "updatedAt",
       header: "Atualizado",
-      cell: (row) => new Date(row.updatedAt).toLocaleDateString("pt-BR"),
+      cell: (row) => new Date(row.updated_at).toLocaleDateString("pt-BR"),
     },
     {
       key: "actions",
@@ -100,11 +106,11 @@ export default function TenantChecklists() {
               <Edit className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDuplicate(row.id)}>
               <Copy className="mr-2 h-4 w-4" />
               Duplicar
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(row.id)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Excluir
             </DropdownMenuItem>
@@ -114,6 +120,14 @@ export default function TenantChecklists() {
       className: "w-12",
     },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -141,7 +155,7 @@ export default function TenantChecklists() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={filteredChecklists}
+        data={checklistsData?.data ?? []}
         onRowClick={(row) => navigate(`/tenant/checklists/${row.id}`)}
       />
     </div>

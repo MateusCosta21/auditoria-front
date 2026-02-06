@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Download,
@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   FileText,
   Signature,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,26 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-
-interface NonConformity {
-  id: string;
-  section: string;
-  question: string;
-  weight: 1 | 2 | 3;
-  comment: string;
-}
-
-const mockNonConformities: NonConformity[] = [
-  { id: "1", section: "Segurança", question: "Os EPIs estão sendo utilizados corretamente?", weight: 3, comment: "Colaborador sem óculos de proteção na área de soldagem" },
-  { id: "2", section: "Organização", question: "As áreas de trabalho estão limpas e ordenadas?", weight: 3, comment: "Materiais espalhados na área de montagem" },
-  { id: "3", section: "Documentação", question: "Os registros estão preenchidos corretamente?", weight: 2, comment: "Falta assinatura do supervisor no formulário de inspeção" },
-];
-
-const sectionScores = [
-  { name: "Organização (5S)", score: 75, maxScore: 100 },
-  { name: "Segurança", score: 66, maxScore: 100 },
-  { name: "Documentação", score: 100, maxScore: 100 },
-];
+import { useAudit } from "@/hooks/tenant/useAudits";
+import { useDownloadAuditPdf } from "@/hooks/tenant/useReports";
+import { useToast } from "@/hooks/use-toast";
 
 const weightLabels = {
   1: { label: "Baixo", variant: "weight-low" as const },
@@ -45,7 +29,28 @@ const weightLabels = {
 
 export default function TenantAuditResult() {
   const navigate = useNavigate();
-  const finalScore = 78;
+  const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+
+  const { data: audit, isLoading } = useAudit(id ? Number(id) : undefined);
+  const downloadPdf = useDownloadAuditPdf();
+
+  const handleDownloadPdf = () => {
+    if (!id) return;
+    downloadPdf.mutate(Number(id), {
+      onError: () => toast({ title: "Erro ao gerar PDF", variant: "destructive" }),
+    });
+  };
+
+  if (isLoading || !audit) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const finalScore = audit.score ?? 0;
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return { color: "text-success", bg: "bg-success", status: "Excelente" };
@@ -55,18 +60,25 @@ export default function TenantAuditResult() {
 
   const scoreStyle = getScoreColor(finalScore);
 
+  const sectionScores = audit.sections.map((s) => {
+    const maxScore = s.max_score ?? 100;
+    const score = s.score ?? 0;
+    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    return { name: s.name, percentage };
+  });
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Resultado da Auditoria"
-        description="5S - Produção | Planta A | 03/02/2024"
+        description={`${audit.checklist_name} | ${audit.unit} | ${new Date(audit.date).toLocaleDateString("pt-BR")}`}
       >
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate("/tenant/auditorias")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
@@ -74,8 +86,16 @@ export default function TenantAuditResult() {
             <Share2 className="h-4 w-4" />
             Compartilhar
           </Button>
-          <Button className="gap-2">
-            <Download className="h-4 w-4" />
+          <Button
+            className="gap-2"
+            onClick={handleDownloadPdf}
+            disabled={downloadPdf.isPending}
+          >
+            {downloadPdf.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
             Gerar PDF
           </Button>
         </div>
@@ -100,21 +120,21 @@ export default function TenantAuditResult() {
               <div>
                 <div className="flex items-center gap-2 justify-center">
                   <CheckCircle className="h-5 w-5 text-success" />
-                  <span className="text-2xl font-bold">6</span>
+                  <span className="text-2xl font-bold">{audit.conform_count}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Conformes</p>
               </div>
               <div>
                 <div className="flex items-center gap-2 justify-center">
                   <XCircle className="h-5 w-5 text-destructive" />
-                  <span className="text-2xl font-bold">3</span>
+                  <span className="text-2xl font-bold">{audit.non_conform_count}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Não Conformes</p>
               </div>
               <div>
                 <div className="flex items-center gap-2 justify-center">
                   <AlertTriangle className="h-5 w-5 text-warning" />
-                  <span className="text-2xl font-bold">2</span>
+                  <span className="text-2xl font-bold">{audit.critical_count}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Críticas</p>
               </div>
@@ -130,19 +150,18 @@ export default function TenantAuditResult() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sectionScores.map((section) => {
-            const percentage = Math.round((section.score / section.maxScore) * 100);
-            const style = getScoreColor(percentage);
+            const style = getScoreColor(section.percentage);
             return (
               <div key={section.name} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{section.name}</span>
-                  <span className={cn("font-bold", style.color)}>{percentage}%</span>
+                  <span className={cn("font-bold", style.color)}>{section.percentage}%</span>
                 </div>
                 <Progress
-                  value={percentage}
+                  value={section.percentage}
                   className={cn(
                     "h-3",
-                    percentage >= 90 ? "[&>div]:bg-success" : percentage >= 70 ? "[&>div]:bg-warning" : "[&>div]:bg-destructive"
+                    section.percentage >= 90 ? "[&>div]:bg-success" : section.percentage >= 70 ? "[&>div]:bg-warning" : "[&>div]:bg-destructive"
                   )}
                 />
               </div>
@@ -156,14 +175,14 @@ export default function TenantAuditResult() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Não Conformidades ({mockNonConformities.length})
+            Não Conformidades ({audit.non_conformities.length})
           </CardTitle>
           <Button variant="outline" onClick={() => navigate("/tenant/nao-conformidades")}>
             Gerenciar Planos de Ação
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mockNonConformities
+          {audit.non_conformities
             .sort((a, b) => b.weight - a.weight)
             .map((nc, index) => (
               <div
@@ -209,10 +228,10 @@ export default function TenantAuditResult() {
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted-foreground">Auditor</p>
               <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed bg-muted/30">
-                <p className="text-muted-foreground">João da Silva</p>
+                <p className="text-muted-foreground">{audit.auditor_name}</p>
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                Assinado digitalmente em 03/02/2024 às 15:32
+                Assinado digitalmente em {new Date(audit.updated_at).toLocaleDateString("pt-BR")}
               </p>
             </div>
             <div className="space-y-3">

@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useTenantAuth } from "@/contexts/TenantAuthContext";
+import { getTenantSlug } from "@/services/api-client";
 
 const menuItems = [
   {
@@ -56,6 +58,12 @@ const menuItems = [
 export function TenantSidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useTenantAuth();
+  const slug = getTenantSlug();
+
+  const initials = slug
+    ? slug.slice(0, 2).toUpperCase()
+    : '??';
 
   return (
     <aside
@@ -121,19 +129,20 @@ export function TenantSidebar() {
         {!collapsed && (
           <div className="mb-3 flex items-center gap-3 px-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sm font-medium text-sidebar-accent-foreground">
-              EC
+              {initials}
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-sidebar-accent-foreground">
-                Empresa Cliente
+                {slug}
               </p>
               <p className="truncate text-xs text-sidebar-foreground">
-                empresax.auditpro.com
+                {user?.name ?? 'Usuário'}
               </p>
             </div>
           </div>
         )}
         <button
+          onClick={() => logout()}
           className={cn(
             "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
