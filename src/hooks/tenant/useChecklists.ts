@@ -9,7 +9,7 @@ export function useChecklists(params?: ChecklistListParams) {
   });
 }
 
-export function useChecklist(id: number | undefined) {
+export function useChecklist(id: string | undefined) {
   return useQuery({
     queryKey: ['tenant', 'checklists', id],
     queryFn: () => checklistsService.getById(id!),
@@ -30,7 +30,7 @@ export function useCreateChecklist() {
 export function useUpdateChecklist() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: SaveChecklistRequest }) =>
+    mutationFn: ({ id, data }: { id: string; data: SaveChecklistRequest }) =>
       checklistsService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'checklists'] });
@@ -41,7 +41,7 @@ export function useUpdateChecklist() {
 export function useDuplicateChecklist() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => checklistsService.duplicate(id),
+    mutationFn: (id: string) => checklistsService.duplicate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'checklists'] });
     },
@@ -51,7 +51,7 @@ export function useDuplicateChecklist() {
 export function useDeleteChecklist() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => checklistsService.delete(id),
+    mutationFn: (id: string) => checklistsService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'checklists'] });
     },

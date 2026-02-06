@@ -46,7 +46,7 @@ export default function TenantChecklistEditor() {
   const isEditing = !!id;
 
   const { data: checklist, isLoading: loadingChecklist } = useChecklist(
-    isEditing ? Number(id) : undefined
+    isEditing ? id : undefined
   );
   const createMutation = useCreateChecklist();
   const updateMutation = useUpdateChecklist();
@@ -171,7 +171,7 @@ export default function TenantChecklistEditor() {
     const payload = buildPayload();
     if (isEditing) {
       updateMutation.mutate(
-        { id: Number(id), data: payload },
+        { id: id!, data: payload },
         {
           onSuccess: () => {
             toast({ title: "Checklist atualizado com sucesso" });

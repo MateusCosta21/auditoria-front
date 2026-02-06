@@ -34,7 +34,8 @@ import { useChecklists } from "@/hooks/tenant/useChecklists";
 import { useCreateAudit, useSaveDraft, useFinalizeAudit } from "@/hooks/tenant/useAudits";
 import { useUploadPhoto } from "@/hooks/tenant/useUploads";
 import { useToast } from "@/hooks/use-toast";
-import type { AnswerPayload, AuditSectionDetail } from "@/types/api";
+import { checklistsService } from "@/services/tenant/checklists";
+import type { AnswerPayload, AuditSectionDetail, ChecklistSection } from "@/types/api";
 
 interface LocalQuestion {
   id: number;
@@ -57,6 +58,12 @@ const weightLabels = {
   1: { label: "Baixo", variant: "weight-low" as const },
   2: { label: "Médio", variant: "weight-medium" as const },
   3: { label: "Alto", variant: "weight-high" as const },
+};
+
+const safeNumber = (value: unknown, fallback: number): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 export default function TenantAuditExecution() {
@@ -101,6 +108,20 @@ export default function TenantAuditExecution() {
       })),
     }));
 
+  const mapSectionsFromChecklist = (sections: ChecklistSection[]): LocalSection[] =>
+    sections.map((s, sIdx) => ({
+      id: safeNumber(s.id, sIdx + 1),
+      name: s.name,
+      questions: s.questions.map((q, qIdx) => ({
+        id: safeNumber(q.id, (sIdx + 1) * 1000 + qIdx + 1),
+        text: q.text,
+        weight: q.weight,
+        photoRequired: q.photo_required,
+        commentRequired: q.comment_required,
+        photos: [],
+      })),
+    }));
+
   const handleStartAudit = () => {
     if (!selectedChecklistId || !unit) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
@@ -108,16 +129,31 @@ export default function TenantAuditExecution() {
     }
     createAudit.mutate(
       {
-        checklist_id: Number(selectedChecklistId),
+        checklist_id: selectedChecklistId,
         unit,
         date: auditDate,
       },
       {
-        onSuccess: (response) => {
+        onSuccess: async (response) => {
           setAuditId(response.audit.id);
           setAuditTitle(`${response.audit.checklist_name} | ${response.audit.unit}`);
-          setSections(mapSectionsFromApi(response.audit.sections));
-          setPhase("execution");
+          const apiSections = response.audit.sections ?? [];
+          if (Array.isArray(apiSections) && apiSections.length > 0) {
+            setSections(mapSectionsFromApi(apiSections));
+            setPhase("execution");
+            return;
+          }
+          try {
+            const checklist = await checklistsService.getById(selectedChecklistId);
+            setSections(mapSectionsFromChecklist(checklist.sections ?? []));
+          } catch {
+            toast({
+              title: "Auditoria criada, mas não foi possível carregar as perguntas",
+              variant: "destructive",
+            });
+          } finally {
+            setPhase("execution");
+          }
         },
         onError: () => {
           toast({ title: "Erro ao criar auditoria", variant: "destructive" });

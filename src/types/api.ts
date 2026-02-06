@@ -112,7 +112,7 @@ export interface ChecklistSection {
 }
 
 export interface ChecklistListItem {
-  id: number;
+  id: string;
   name: string;
   category: string;
   status: 'active' | 'draft';
@@ -123,7 +123,7 @@ export interface ChecklistListItem {
 }
 
 export interface ChecklistDetail {
-  id: number;
+  id: string;
   name: string;
   category: string;
   status: 'active' | 'draft';
@@ -200,7 +200,7 @@ export interface AuditNonConformity {
 
 export interface AuditDetail {
   id: number;
-  checklist_id: number;
+  checklist_id: string;
   checklist_name: string;
   unit: string;
   auditor_name: string;
@@ -217,7 +217,7 @@ export interface AuditDetail {
 }
 
 export interface CreateAuditRequest {
-  checklist_id: number;
+  checklist_id: string;
   unit: string;
   date: string;
 }
