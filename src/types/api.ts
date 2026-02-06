@@ -57,13 +57,44 @@ export interface ToggleStatusResponse {
 
 // Tenant User types (for tenant portal)
 export interface TenantUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'admin' | 'auditor' | 'user';
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TenantUserListItem {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'auditor' | 'user';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TenantUserListResponse {
+  data: TenantUserListItem[];
+  total: number;
+}
+
+export interface CreateTenantUserRequest {
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'auditor' | 'user';
+  is_active?: boolean;
+}
+
+export interface UpdateTenantUserRequest {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: 'admin' | 'auditor' | 'user';
+  is_active?: boolean;
 }
 
 export interface TenantLoginResponse {

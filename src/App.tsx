@@ -35,6 +35,7 @@ import TenantAuditExecution from "./pages/tenant/TenantAuditExecution";
 import TenantAuditResult from "./pages/tenant/TenantAuditResult";
 import TenantNonConformities from "./pages/tenant/TenantNonConformities";
 import TenantReports from "./pages/tenant/TenantReports";
+import TenantUsers from "./pages/tenant/TenantUsers";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +84,7 @@ function TenantRoutes() {
           <Route path="auditorias/nova" element={<TenantAuditExecution />} />
           <Route path="auditorias/:id" element={<TenantAuditResult />} />
           <Route path="auditorias/:id/resultado" element={<TenantAuditResult />} />
+          <Route path="usuarios" element={<TenantUsers />} />
           <Route path="nao-conformidades" element={<TenantNonConformities />} />
           <Route path="relatorios" element={<TenantReports />} />
           <Route path="configuracoes" element={<TenantDashboard />} />

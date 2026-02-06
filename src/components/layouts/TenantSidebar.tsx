@@ -11,6 +11,7 @@ import {
   LogOut,
   CheckSquare,
   ChevronLeft,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -37,6 +38,11 @@ const menuItems = [
     title: "Auditorias",
     icon: FileCheck,
     href: "/tenant/auditorias",
+  },
+  {
+    title: "Usuários",
+    icon: Users,
+    href: "/tenant/usuarios",
   },
   {
     title: "Não Conformidades",
