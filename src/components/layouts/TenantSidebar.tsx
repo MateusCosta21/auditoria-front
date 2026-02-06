@@ -102,10 +102,13 @@ export function TenantSidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3">
         {menuItems.map((item) => {
+          const isAuditsRoot = item.href === "/tenant/auditorias";
+          const isNewAudit = location.pathname.startsWith("/tenant/auditorias/nova");
           const isActive =
             location.pathname === item.href ||
             (item.href !== "/tenant" &&
-              location.pathname.startsWith(item.href));
+              location.pathname.startsWith(item.href) &&
+              !(isAuditsRoot && isNewAudit));
           return (
             <NavLink
               key={item.href}
