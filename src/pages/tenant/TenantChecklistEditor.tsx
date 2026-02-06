@@ -124,6 +124,14 @@ export default function TenantChecklistEditor() {
     }));
   };
 
+  const removeSection = (sectionId: string) => {
+    if (sections.length <= 1) {
+      toast({ title: "Mantenha pelo menos uma seção", variant: "destructive" });
+      return;
+    }
+    setSections(sections.filter(s => s.id !== sectionId));
+  };
+
   const updateQuestion = (sectionId: string, questionId: string, updates: Partial<Question>) => {
     setSections(sections.map(s => {
       if (s.id === sectionId) {
@@ -294,6 +302,18 @@ export default function TenantChecklistEditor() {
                   <StatusBadge variant="default">
                     {section.questions.length} perguntas
                   </StatusBadge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSection(section.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CollapsibleTrigger>
               </CardHeader>
 
