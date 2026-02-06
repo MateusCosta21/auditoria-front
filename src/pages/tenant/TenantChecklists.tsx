@@ -25,7 +25,7 @@ export default function TenantChecklists() {
   const duplicateMutation = useDuplicateChecklist();
   const deleteMutation = useDeleteChecklist();
 
-  const handleDuplicate = (id: number) => {
+  const handleDuplicate = (id: string) => {
     duplicateMutation.mutate(id, {
       onSuccess: () => {
         toast({ title: "Checklist duplicado com sucesso" });
@@ -36,7 +36,7 @@ export default function TenantChecklists() {
     });
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     deleteMutation.mutate(id, {
       onSuccess: () => {
         toast({ title: "Checklist excluído com sucesso" });

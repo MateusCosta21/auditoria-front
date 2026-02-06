@@ -41,7 +41,7 @@ export default function TenantReports() {
   const downloadPdf = useDownloadAuditPdf();
   const downloadConsolidated = useDownloadConsolidatedPdf();
 
-  const handleDownloadPdf = (auditId: number) => {
+  const handleDownloadPdf = (auditId: string) => {
     downloadPdf.mutate(auditId, {
       onError: () => toast({ title: "Erro ao gerar PDF", variant: "destructive" }),
     });

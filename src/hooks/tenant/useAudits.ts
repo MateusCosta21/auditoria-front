@@ -9,7 +9,7 @@ export function useAudits(params?: AuditListParams) {
   });
 }
 
-export function useAudit(id: number | undefined) {
+export function useAudit(id: string | undefined) {
   return useQuery({
     queryKey: ['tenant', 'audits', id],
     queryFn: () => auditsService.getById(id!),
@@ -30,7 +30,7 @@ export function useCreateAudit() {
 export function useUpdateAnswers() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, answers }: { id: number; answers: AnswerPayload[] }) =>
+    mutationFn: ({ id, answers }: { id: string; answers: AnswerPayload[] }) =>
       auditsService.updateAnswers(id, answers),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'audits', variables.id] });
@@ -41,7 +41,7 @@ export function useUpdateAnswers() {
 export function useSaveDraft() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, answers }: { id: number; answers: AnswerPayload[] }) =>
+    mutationFn: ({ id, answers }: { id: string; answers: AnswerPayload[] }) =>
       auditsService.saveDraft(id, answers),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'audits', variables.id] });
@@ -52,7 +52,7 @@ export function useSaveDraft() {
 export function useFinalizeAudit() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => auditsService.finalize(id),
+    mutationFn: (id: string) => auditsService.finalize(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant', 'audits'] });
       queryClient.invalidateQueries({ queryKey: ['tenant', 'dashboard'] });

@@ -11,7 +11,7 @@ export function useReports(params?: ReportListParams) {
 
 export function useDownloadAuditPdf() {
   return useMutation({
-    mutationFn: (auditId: number) => reportsService.downloadAuditPdf(auditId),
+    mutationFn: (auditId: string) => reportsService.downloadAuditPdf(auditId),
     onSuccess: (blob, auditId) => {
       downloadBlob(blob, `auditoria-${auditId}.pdf`);
     },

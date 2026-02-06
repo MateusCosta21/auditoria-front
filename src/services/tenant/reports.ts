@@ -17,7 +17,7 @@ export const reportsService = {
     return response.data;
   },
 
-  async downloadAuditPdf(auditId: number): Promise<Blob> {
+  async downloadAuditPdf(auditId: string): Promise<Blob> {
     const api = getTenantApi();
     const response = await api.get(`/reports/${auditId}/pdf`, {
       responseType: 'blob',

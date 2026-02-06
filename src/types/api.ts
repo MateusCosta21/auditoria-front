@@ -156,7 +156,7 @@ export interface SaveChecklistRequest {
 
 // Audit types
 export interface AuditListItem {
-  id: number;
+  id: string;
   checklist_name: string;
   unit: string;
   auditor_name: string;
@@ -199,7 +199,7 @@ export interface AuditNonConformity {
 }
 
 export interface AuditDetail {
-  id: number;
+  id: string;
   checklist_id: string;
   checklist_name: string;
   unit: string;
@@ -250,7 +250,7 @@ export interface NonConformityListItem {
   item: string;
   section: string;
   weight: 1 | 2 | 3;
-  audit_id: number;
+  audit_id: string;
   audit_date: string;
   responsible: string | null;
   deadline: string | null;
@@ -274,7 +274,7 @@ export interface NonConformityDetail {
   item: string;
   section: string;
   weight: 1 | 2 | 3;
-  audit_id: number;
+  audit_id: string;
   audit_date: string;
   responsible: string | null;
   deadline: string | null;
@@ -285,7 +285,7 @@ export interface NonConformityDetail {
 
 // Report types
 export interface ReportListItem {
-  id: number;
+  id: string;
   checklist: string;
   unit: string;
   auditor: string;

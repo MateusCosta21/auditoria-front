@@ -23,7 +23,7 @@ export const auditsService = {
     return response.data;
   },
 
-  async getById(id: number): Promise<AuditDetail> {
+  async getById(id: string): Promise<AuditDetail> {
     const api = getTenantApi();
     const response = await api.get<AuditDetail>(`/audits/${id}`);
     return response.data;
@@ -35,19 +35,19 @@ export const auditsService = {
     return response.data;
   },
 
-  async updateAnswers(id: number, answers: AnswerPayload[]): Promise<UpdateAnswersResponse> {
+  async updateAnswers(id: string, answers: AnswerPayload[]): Promise<UpdateAnswersResponse> {
     const api = getTenantApi();
     const response = await api.put<UpdateAnswersResponse>(`/audits/${id}/answers`, { answers });
     return response.data;
   },
 
-  async saveDraft(id: number, answers: AnswerPayload[]): Promise<UpdateAnswersResponse> {
+  async saveDraft(id: string, answers: AnswerPayload[]): Promise<UpdateAnswersResponse> {
     const api = getTenantApi();
     const response = await api.put<UpdateAnswersResponse>(`/audits/${id}/save-draft`, { answers });
     return response.data;
   },
 
-  async finalize(id: number): Promise<FinalizeAuditResponse> {
+  async finalize(id: string): Promise<FinalizeAuditResponse> {
     const api = getTenantApi();
     const response = await api.post<FinalizeAuditResponse>(`/audits/${id}/finalize`);
     return response.data;

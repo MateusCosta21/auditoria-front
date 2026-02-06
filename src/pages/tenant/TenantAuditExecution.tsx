@@ -78,7 +78,7 @@ export default function TenantAuditExecution() {
   const [auditDate, setAuditDate] = useState(new Date().toISOString().split("T")[0]);
 
   // Execution state
-  const [auditId, setAuditId] = useState<number | null>(null);
+  const [auditId, setAuditId] = useState<string | null>(null);
   const [auditTitle, setAuditTitle] = useState("");
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [sections, setSections] = useState<LocalSection[]>([]);

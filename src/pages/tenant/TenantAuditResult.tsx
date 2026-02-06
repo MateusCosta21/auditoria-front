@@ -32,12 +32,12 @@ export default function TenantAuditResult() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
 
-  const { data: audit, isLoading } = useAudit(id ? Number(id) : undefined);
+  const { data: audit, isLoading } = useAudit(id ?? undefined);
   const downloadPdf = useDownloadAuditPdf();
 
   const handleDownloadPdf = () => {
     if (!id) return;
-    downloadPdf.mutate(Number(id), {
+    downloadPdf.mutate(id, {
       onError: () => toast({ title: "Erro ao gerar PDF", variant: "destructive" }),
     });
   };
